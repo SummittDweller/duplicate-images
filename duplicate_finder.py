@@ -8,6 +8,7 @@ Usage:
     duplicate_finder.py clear [--db=<db_path>]
     duplicate_finder.py show [--db=<db_path>]
     duplicate_finder.py find [--print] [--match-time] [--trash=<trash_path>] [--db=<db_path>]
+    duplicate_finder.py delete [--print] [--match-time] [--trash=<trash_path>] [--db=<db_path>]
     duplicate_finder.py -h | –-help
 
 Options:
@@ -18,13 +19,12 @@ Options:
     --parallel=<num_processes> The number of parallel processes to run to hash the image
                                files (default: 8).
 
-    find:
+    find | delete:
         --print               Only print duplicate files rather than displaying HTML file
         --match-time          Adds the extra constraint that duplicate images must have the
                               same capture times in order to be considered.
         --trash=<trash_path>  Where files will be put when they are deleted (default: ./Trash)
 """
-
 
 import imagehash
 import pymongo
@@ -220,6 +220,53 @@ def find(db, print_, match_time):
     else:
         display_duplicates(dups, partial(remove_image, db=db))
 
+# MAM - New delete function is here!        
+def delete(db, print_, match_time):
+    dups = db.aggregate([
+        {"$group":
+            {
+                "_id": "$hash",
+                "total": {"$sum": 1},
+                "items":
+                    {
+                        "$push":
+                            {
+                                "file_name": "$_id",
+                                "file_size": "$file_size",
+                                "image_size": "$image_size",
+                                "capture_time": "$capture_time"
+                            }
+                    }
+            }
+        },
+        {"$match":
+            {
+                "total" : {"$gt": 1}
+            }
+        }])
+
+    dups = list(dups)
+
+    if match_time:
+        def same_time(dup):
+            items = dup['items']
+            if "Time unknown" in items:
+                # Since we can't know for sure, better safe than sorry
+                return True
+
+            if len(set([i['capture_time'] for i in items])) > 1:
+                return False
+
+            return True
+
+        dups = [d for d in dups if same_time(d)]
+
+    if print_:
+        pprint(dups)
+        print("Number of duplicates: {}".format(len(dups)))
+    else:
+        display_duplicates(dups, partial(remove_image, db=db))
+
 
 def display_duplicates(duplicates, delete_cb):
     with TemporaryDirectory() as folder:
@@ -300,6 +347,8 @@ if __name__ == '__main__':
             show(db)
         elif args['find']:
             find(db, args['--print'], args['--match-time'])
+        elif args['delete']:
+            delete(db, args['--print'], args['--match-time'])
 
 
 
