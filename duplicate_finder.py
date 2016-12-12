@@ -45,6 +45,8 @@ from jinja2 import Template, FileSystemLoader, Environment
 from flask import Flask, send_from_directory
 from PIL import Image, ExifTags
 from subprocess import Popen, PIPE
+# from https://pypi.python.org/pypi/pudb
+from pudb import set_trace
 
 TRASH = "./Trash/"
 DB_PATH = "./db"
@@ -222,6 +224,7 @@ def find(db, print_, match_time):
 
 # MAM - New delete function is here!        
 def delete(db, print_, match_time):
+    set_trace()
     dups = db.aggregate([
         {"$group":
             {
@@ -261,11 +264,11 @@ def delete(db, print_, match_time):
 
         dups = [d for d in dups if same_time(d)]
 
-    if print_:
-        pprint(dups)
-        print("Number of duplicates: {}".format(len(dups)))
-    else:
-        display_duplicates(dups, partial(remove_image, db=db))
+#    if print_:
+#        pprint(dups)
+#        print("Number of duplicates: {}".format(len(dups)))
+#    else:
+#        display_duplicates(dups, partial(remove_image, db=db))
 
 
 def display_duplicates(duplicates, delete_cb):
