@@ -113,8 +113,9 @@ def hash_file(file, contains_cb, result_cb):
             result_cb(file, hashes, file_size, image_size, capture_time)
 
             cprint("\tHashed {}".format(file), "blue")
-        except OSError:
+        except OSError as err:
             cprint("Unable to open {}".format(file), "red")
+            cprint("  OS error: {0}".format(err), "red")
 
 
 def hash_files_parallel(files, contains_cb, result_cb):
