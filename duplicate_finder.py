@@ -7,8 +7,7 @@ Usage:
     duplicate_finder.py remove <path> ... [--db=<db_path>]
     duplicate_finder.py clear [--db=<db_path>]
     duplicate_finder.py show [--db=<db_path>]
-    duplicate_finder.py find [--print] [--match-time] [--trash=<trash_path>] [--db=<db_path>]
-    duplicate_finder.py delete [--print] [--match-time] [--trash=<trash_path>] [--db=<db_path>]
+    duplicate_finder.py find [--print] [--match-time] [--delete] [--trash=<trash_path>] [--db=<db_path>]
     duplicate_finder.py -h | –-help
 
 Options:
@@ -19,11 +18,12 @@ Options:
     --parallel=<num_processes> The number of parallel processes to run to hash the image
                                files (default: 8).
 
-    find | delete:
+    find:
         --print               Only print duplicate files rather than displaying HTML file
         --match-time          Adds the extra constraint that duplicate images must have the
                               same capture times in order to be considered.
-        --trash=<trash_path>  Where files will be put when they are deleted (default: ./Trash)
+        --delete              Triggers script deletion of newest and smallest duplicates!
+        --trash=<trash_path>  Obsolete! Where files will be put when they are deleted (default: ./Trash)
 """
 
 import imagehash
@@ -45,6 +45,7 @@ from jinja2 import Template, FileSystemLoader, Environment
 from flask import Flask, send_from_directory
 from PIL import Image, ExifTags
 from subprocess import Popen, PIPE
+from operator import itemgetter
 # from https://pypi.python.org/pypi/pudb
 from pudb import set_trace
 
@@ -176,7 +177,7 @@ def show(db):
     print("Total: {}".format(total))
 
 
-def find(db, print_, match_time):
+def find(db, print_, match_time, delete_duplicates):
     dups = db.aggregate([
         {"$group":
             {
@@ -219,56 +220,32 @@ def find(db, print_, match_time):
     if print_:
         pprint(dups)
         print("Number of duplicates: {}".format(len(dups)))
-    else:
-        display_duplicates(dups, partial(remove_image, db=db))
 
-# MAM - New delete function is here!        
-def delete(db, print_, match_time):
-    set_trace()
-    dups = db.aggregate([
-        {"$group":
-            {
-                "_id": "$hash",
-                "total": {"$sum": 1},
-                "items":
-                    {
-                        "$push":
-                            {
-                                "file_name": "$_id",
-                                "file_size": "$file_size",
-                                "image_size": "$image_size",
-                                "capture_time": "$capture_time"
-                            }
-                    }
-            }
-        },
-        {"$match":
-            {
-                "total" : {"$gt": 1}
-            }
-        }])
 
-    dups = list(dups)
+    # Be careful here!
+    if delete_duplicates:
+        for duplicates in dups:
+            print("------------------------------------------")
+            dset = duplicates['items']
+            dset.sort(key=itemgetter('file_size'), reverse=True)
+            dset.sort(key=itemgetter('capture_time'))
+            for i, file in enumerate(dset):
+                if i > 0:
+                    print("Delete duplicate file: ", file['file_name'])
+                    print("  Capture time | size: ", file['capture_time'], "|", file['file_size'])
+#                   answer = input("Please indicate approval? [y/n]")
+#                   if not answer or answer[0].lower() != 'y':
+#                       print("You did not indicate approval!")
+#                       exit(1)
+                    try:
+                        os.remove(file['file_name'])
+                    except OSError as err:
+                        cprint("Unable to delete {}".format(file['file_name']), "red")
+                        cprint("  OS error: {0}".format(err), "red") 
 
-    if match_time:
-        def same_time(dup):
-            items = dup['items']
-            if "Time unknown" in items:
-                # Since we can't know for sure, better safe than sorry
-                return True
+#   else:
+#       display_duplicates(dups, partial(remove_image, db=db))
 
-            if len(set([i['capture_time'] for i in items])) > 1:
-                return False
-
-            return True
-
-        dups = [d for d in dups if same_time(d)]
-
-#    if print_:
-#        pprint(dups)
-#        print("Number of duplicates: {}".format(len(dups)))
-#    else:
-#        display_duplicates(dups, partial(remove_image, db=db))
 
 
 def display_duplicates(duplicates, delete_cb):
@@ -349,9 +326,7 @@ if __name__ == '__main__':
         elif args['show']:
             show(db)
         elif args['find']:
-            find(db, args['--print'], args['--match-time'])
-        elif args['delete']:
-            delete(db, args['--print'], args['--match-time'])
+            find(db, args['--print'], args['--match-time'], args['--delete'])
 
 
 
