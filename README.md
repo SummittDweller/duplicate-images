@@ -34,21 +34,24 @@ python duplicate_finder.py
 
 ```
 Usage:
-    duplicate_finder.py add <path> ...
-    duplicate_finder.py remove <path> ...
-    duplicate_finder.py clear
-    duplicate_finder.py show
-    duplicate_finder.py find [--print] [--match-time] [--trash=<trash_path>]
+    duplicate_finder.py add <path> ... [--db=<db_path>] [--parallel=<num_processes>]
+    duplicate_finder.py remove <path> ... [--db=<db_path>]
+    duplicate_finder.py clear [--db=<db_path>]
+    duplicate_finder.py show [--db=<db_path>]
+    duplicate_finder.py find [--print] [--match-time] [--delete] [--trash=<trash_path>] [--db=<db_path>]
     duplicate_finder.py -h | –-help
-
+    
 Options:
-    -h, -–help            Show this screen
-
+    -h, -–help                Show this screen
+    --db=<db_path>            The location of the database. (default: ./db)
+    --parallel=<num_processes> The number of parallel processes to run to hash the image
+                               files (default: 8).
     find:
         --print               Only print duplicate files rather than displaying HTML file
         --match-time          Adds the extra constraint that duplicate images must have the
                               same capture times in order to be considered.
-        --trash=<trash_path>  Where files will be put when they are deleted (default: ./Trash)
+        --delete              Triggers script deletion of newest and smallest duplicates!
+        --trash=<trash_path>  Obsolete! Where files will be put when they are deleted (default: ./Trash)
 ```
 
 ### Add
